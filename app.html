@@ -786,7 +786,7 @@ function renderJobs() {
   const empty = document.getElementById('emptyState');
   const countEl = document.getElementById('queueCountDisplay');
 
-  countEl.textContent = jobs.length + ' job' + (jobs.length !== 1 ? 's' : '');
+  if (countEl) countEl.textContent = jobs.length + ' job' + (jobs.length !== 1 ? 's' : '');
   empty.style.display = jobs.length === 0 ? 'block' : 'none';
   list.innerHTML = '';
 
@@ -993,7 +993,7 @@ async function callAI(prompt) {
         { role: 'system', content: 'You are an expert career coach and recruiter. You ONLY output raw valid JSON — no markdown, no code fences, no explanation before or after. Start your response with { and end with }.' },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 700,
+      max_tokens: 1200,
       temperature: 1.0,
     }),
   });
@@ -1008,28 +1008,48 @@ async function callAI(prompt) {
 }
 
 function parseResult(text) {
-  // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
-  let cleaned = text
+  // 1. Strip <think>...</think> reasoning blocks (MiniMax M2.7 reasoning model)
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // 2. Strip markdown code fences
+  cleaned = cleaned
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/g, '')
     .trim();
 
-  // Extract the first JSON object
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) {
+  // 3. Find the JSON object
+  const start = cleaned.indexOf('{');
+  if (start === -1) {
     console.error('Raw AI response:', text);
-    throw new Error('Could not find JSON in response — check console for raw output');
+    throw new Error('No JSON found in response');
   }
+  let jsonStr = cleaned.slice(start);
+
+  // 4. Auto-repair truncated JSON (add missing closing braces)
+  let depth = 0;
+  let inStr = false, escape = false;
+  for (const ch of jsonStr) {
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inStr) { escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (!inStr) {
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+    }
+  }
+  // Close any unclosed string + braces
+  if (inStr) jsonStr += '"';
+  while (depth > 0) { jsonStr += '}'; depth--; }
 
   let r;
   try {
-    r = JSON.parse(match[0]);
+    r = JSON.parse(jsonStr);
   } catch (e) {
-    console.error('JSON parse error. Raw:', match[0]);
-    throw new Error('Invalid JSON from AI — ' + e.message);
+    console.error('JSON parse failed. Attempted:', jsonStr);
+    throw new Error('Could not parse AI response — ' + e.message);
   }
 
-  // Fill in any missing fields with safe defaults
+  // 5. Safe defaults for missing fields
   r.grade          = r.grade          || 'C';
   r.summary        = r.summary        || 'No summary provided';
   r.cvMatch        = Number(r.cvMatch)  || 3;
