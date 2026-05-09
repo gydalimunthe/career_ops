@@ -606,6 +606,7 @@
           <input type="text" id="dealBreakers" placeholder="e.g. no pure coding, no 5+ yr gaps">
         </div>
         <button class="btn btn-primary" style="width:100%;margin-top:4px;" onclick="saveProfile()">Save Profile</button>
+        <p style="font-size:11px;color:var(--text-faint);margin-top:6px;text-align:center;">Profile auto-saves when you hit Evaluate</p>
       </div>
 
       <!-- MODEL -->
@@ -1080,8 +1081,20 @@ function exportAll() {
 //  UTILS
 // ═══════════════════════════════
 function validateReady() {
+  // Auto-save profile from fields before evaluating
+  const bgVal = document.getElementById('profileBg').value.trim();
+  if (bgVal) {
+    profile = {
+      bg: bgVal,
+      targetRoles: document.getElementById('targetRoles').value.trim(),
+      salary: document.getElementById('salaryRange').value.trim(),
+      visa: document.getElementById('visaStatus').value,
+      dealBreakers: document.getElementById('dealBreakers').value.trim(),
+    };
+    localStorage.setItem('co_profile', JSON.stringify(profile));
+  }
   if (!profile.bg) {
-    toast('Please fill in your profile background first', 'error');
+    toast('Please fill in your background in the profile panel', 'error');
     document.getElementById('profileBg').focus();
     return false;
   }
