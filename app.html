@@ -506,7 +506,7 @@
       <div class="step-card">
         <div class="step-num">3</div>
         <h3>Get Scored Reports</h3>
-        <p>Claude evaluates each role across 5 dimensions and gives you a recommendation + pitch angle.</p>
+        <p>MiniMax AI evaluates each role across 5 dimensions and gives you a recommendation + pitch angle.</p>
       </div>
     </div>
   </div>
@@ -532,9 +532,9 @@
         <p>For recommended roles, get an exact narrative on how to position yourself in a cover letter or intro.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">🔑</div>
-        <h3>Your Key, Your Data</h3>
-        <p>Uses your own Claude API key. Nothing is stored on any server — everything runs in your browser.</p>
+        <div class="feature-icon">🆓</div>
+        <h3>Completely Free</h3>
+        <p>No sign-up, no API key needed. Powered by MiniMax AI — just fill in your profile and go.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">⚡</div>
@@ -562,18 +562,18 @@
     <!-- SIDEBAR -->
     <div class="sidebar">
 
-      <!-- API KEY -->
+      <!-- AI STATUS -->
       <div class="panel">
-        <div class="panel-title">🔑 Claude API Key</div>
-        <div class="form-group">
-          <div class="api-key-row">
-            <input type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off">
-            <button class="btn btn-ghost btn-sm" onclick="saveKey()">Save</button>
+        <div class="panel-title">🤖 AI Engine</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:8px;">
+          <span style="font-size:18px;">⚡</span>
+          <div>
+            <div style="font-weight:600;font-size:13px;color:#6ee7b7;">MiniMax M2.7</div>
+            <div style="font-size:11px;color:var(--text-faint);margin-top:1px;">Ready — no key needed</div>
           </div>
-          <div id="keyStatus" class="key-status none">● Not set</div>
         </div>
-        <p style="font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
-          Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--purple);text-decoration:none;">console.anthropic.com</a>. Stored in sessionStorage only — cleared when tab closes.
+        <p style="font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.6;">
+          Powered by <a href="https://www.minimax.io" target="_blank" style="color:var(--purple);text-decoration:none;">MiniMax</a>. Just fill in your profile and start evaluating — free for everyone.
         </p>
       </div>
 
@@ -610,13 +610,12 @@
 
       <!-- MODEL -->
       <div class="panel">
-        <div class="panel-title">⚙️ Settings</div>
+        <div class="panel-title">⚙️ Model</div>
         <div class="form-group">
-          <label>Claude Model</label>
           <select id="modelSelect">
-            <option value="claude-opus-4-5">claude-opus-4-5 (best quality)</option>
-            <option value="claude-sonnet-4-5" selected>claude-sonnet-4-5 (fast + good)</option>
-            <option value="claude-haiku-4-5">claude-haiku-4-5 (cheapest)</option>
+            <option value="MiniMax-M2.7" selected>MiniMax-M2.7 (best)</option>
+            <option value="MiniMax-M2.5">MiniMax-M2.5 (fast)</option>
+            <option value="MiniMax-M2.1">MiniMax-M2.1 (light)</option>
           </select>
         </div>
       </div>
@@ -675,15 +674,16 @@
 <div class="modal-bg" id="onboardModal">
   <div class="modal">
     <h2>Welcome to Career-Ops ⚡</h2>
-    <p>Before you start, you need two things:</p>
-    <ol style="padding-left:20px;font-size:13px;color:var(--text-dim);line-height:2;">
-      <li>A <strong style="color:var(--text)">Claude API key</strong> from <a href="https://console.anthropic.com" target="_blank" style="color:var(--purple);">console.anthropic.com</a></li>
-      <li>A short <strong style="color:var(--text)">profile description</strong> — your background, target roles, visa status</li>
+    <p>No sign-up. No API key. Just fill in your profile and start evaluating jobs instantly — powered by MiniMax AI.</p>
+    <ol style="padding-left:20px;font-size:13px;color:var(--text-dim);line-height:2.2;">
+      <li>Fill in your <strong style="color:var(--text)">profile</strong> — background, target roles, visa status</li>
+      <li>Paste any <strong style="color:var(--text)">job description</strong> from LinkedIn, Indeed, or anywhere</li>
+      <li>Hit <strong style="color:var(--text)">Evaluate</strong> — get a grade, scores, and pitch angle in seconds</li>
     </ol>
-    <p style="margin-top:12px;">Both live only in your browser session. Nothing is sent to any server except Anthropic's API.</p>
+    <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">Everything runs in your browser. Your profile is saved locally.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('onboardModal')">Maybe later</button>
-      <button class="btn btn-primary" onclick="closeModal('onboardModal');document.getElementById('apiKey').focus()">Got it, let's go →</button>
+      <button class="btn btn-primary" onclick="closeModal('onboardModal');document.getElementById('profileBg').focus()">Let's go →</button>
     </div>
   </div>
 </div>
@@ -692,10 +692,12 @@
 // ═══════════════════════════════
 //  STATE
 // ═══════════════════════════════
-let jobs = [];
+const MINIMAX_KEY = 'sk-api-6JZmShseKsB-84Ne7XxvM1RPS0IuxszwOPS7pwGvDXh3ohmDuKgYP_uYaAc1mK3D2tp_1DcLvDIhdkPVp3jau1JILf3ja9NUL7gfF345sUAH1S-OB_nXyA8';
+const MINIMAX_URL = 'https://api.minimax.io/v1/chat/completions';
+
+let jobs    = [];
 let running = false;
-let apiKey = sessionStorage.getItem('co_apikey') || '';
-let profile = JSON.parse(sessionStorage.getItem('co_profile') || '{}');
+let profile = JSON.parse(localStorage.getItem('co_profile') || '{}');
 
 // ═══════════════════════════════
 //  VIEWS
@@ -712,29 +714,7 @@ window.addEventListener('scroll', () => {
   document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 20);
 });
 
-// ═══════════════════════════════
-//  API KEY
-// ═══════════════════════════════
-function saveKey() {
-  apiKey = document.getElementById('apiKey').value.trim();
-  if (!apiKey) { toast('Enter an API key first', 'error'); return; }
-  sessionStorage.setItem('co_apikey', apiKey);
-  updateKeyStatus(true);
-  toast('API key saved ✓', 'success');
-}
-
-function updateKeyStatus(ok) {
-  const el = document.getElementById('keyStatus');
-  if (!apiKey) { el.className = 'key-status none'; el.textContent = '● Not set'; return; }
-  if (ok === true) { el.className = 'key-status ok'; el.textContent = '● Ready'; }
-  if (ok === false) { el.className = 'key-status bad'; el.textContent = '● Invalid key'; }
-}
-
-// Restore key on load
-if (apiKey) {
-  document.getElementById('apiKey').value = apiKey;
-  updateKeyStatus(true);
-}
+// (no API key UI needed — MiniMax key is built in)
 
 // ═══════════════════════════════
 //  PROFILE
@@ -747,7 +727,7 @@ function saveProfile() {
     visa: document.getElementById('visaStatus').value,
     dealBreakers: document.getElementById('dealBreakers').value.trim(),
   };
-  sessionStorage.setItem('co_profile', JSON.stringify(profile));
+  localStorage.setItem('co_profile', JSON.stringify(profile));
   toast('Profile saved ✓', 'success');
 }
 
@@ -934,17 +914,12 @@ async function evalJob(job) {
   const prompt = buildPrompt(job);
 
   try {
-    const res = await callClaude(prompt);
+    const res = await callAI(prompt);
     job.result = parseResult(res);
     job.status = job.result.recommendation === 'SKIP' ? 'skip' : 'done';
   } catch (e) {
     job.status = 'pending';
     console.error(e);
-    if (e.message.includes('401')) {
-      updateKeyStatus(false);
-      toast('Invalid API key — please check and re-save', 'error');
-      throw e;
-    }
     toast('Error evaluating "' + job.title + '": ' + e.message, 'error');
   }
 }
@@ -1003,20 +978,22 @@ If visa status is F-1 OPT and JD says "USC/GC only" or "must be authorized witho
 Return ONLY valid JSON.`;
 }
 
-async function callClaude(prompt) {
+async function callAI(prompt) {
   const model = document.getElementById('modelSelect').value;
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(MINIMAX_URL, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Authorization': 'Bearer ' + MINIMAX_KEY,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       model,
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: 'You are an expert career coach and recruiter. Always respond with valid JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 600,
+      temperature: 1.0,
     }),
   });
 
@@ -1026,7 +1003,7 @@ async function callClaude(prompt) {
   }
 
   const data = await response.json();
-  return data.content[0].text;
+  return data.choices[0].message.content;
 }
 
 function parseResult(text) {
@@ -1103,7 +1080,6 @@ function exportAll() {
 //  UTILS
 // ═══════════════════════════════
 function validateReady() {
-  if (!apiKey) { toast('Please enter your Claude API key first', 'error'); return false; }
   if (!profile.bg) {
     toast('Please fill in your profile background first', 'error');
     document.getElementById('profileBg').focus();
@@ -1136,13 +1112,13 @@ function closeModal(id) {
 //  INIT
 // ═══════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  // Show onboarding if no key
-  if (!apiKey) {
+  // Show onboarding if no profile yet
+  if (!profile.bg) {
     setTimeout(() => {
       if (document.getElementById('view-app').classList.contains('active')) {
         document.getElementById('onboardModal').classList.add('open');
       }
-    }, 500);
+    }, 400);
   }
   renderJobs();
   loadProfileFields();
