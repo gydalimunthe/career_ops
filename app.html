@@ -990,10 +990,10 @@ async function callAI(prompt) {
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: 'You are an expert career coach and recruiter. Always respond with valid JSON only.' },
+        { role: 'system', content: 'You are an expert career coach and recruiter. You ONLY output raw valid JSON — no markdown, no code fences, no explanation before or after. Start your response with { and end with }.' },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 600,
+      max_tokens: 700,
       temperature: 1.0,
     }),
   });
@@ -1008,15 +1008,38 @@ async function callAI(prompt) {
 }
 
 function parseResult(text) {
-  // Extract JSON from response
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Could not parse AI response');
-  const r = JSON.parse(match[0]);
+  // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+  let cleaned = text
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
 
-  // Validate
-  ['grade','summary','cvMatch','alignment','comp','culture','redFlags','recommendation','recReason'].forEach(k => {
-    if (r[k] === undefined) throw new Error('Missing field: ' + k);
-  });
+  // Extract the first JSON object
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.error('Raw AI response:', text);
+    throw new Error('Could not find JSON in response — check console for raw output');
+  }
+
+  let r;
+  try {
+    r = JSON.parse(match[0]);
+  } catch (e) {
+    console.error('JSON parse error. Raw:', match[0]);
+    throw new Error('Invalid JSON from AI — ' + e.message);
+  }
+
+  // Fill in any missing fields with safe defaults
+  r.grade          = r.grade          || 'C';
+  r.summary        = r.summary        || 'No summary provided';
+  r.cvMatch        = Number(r.cvMatch)  || 3;
+  r.alignment      = Number(r.alignment)|| 3;
+  r.comp           = Number(r.comp)     || 3;
+  r.culture        = Number(r.culture)  || 3;
+  r.redFlags       = Number(r.redFlags) || 3;
+  r.recommendation = r.recommendation  || 'CONSIDER';
+  r.recReason      = r.recReason       || '';
+  r.pitch          = r.pitch           || null;
 
   return r;
 }
