@@ -6,6 +6,8 @@
 <title>Career-Ops — AI Job Evaluator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
 <style>
   :root {
     --bg: #080810;
@@ -452,6 +454,8 @@
   <a class="nav-logo" href="#" onclick="showView('landing')">⚡ Career-Ops</a>
   <div class="nav-links">
     <a class="btn btn-ghost btn-sm" href="#" onclick="showView('landing')">Home</a>
+    <a class="btn btn-ghost btn-sm" href="/dashboard.html" id="navDashboard" style="display:none">Dashboard</a>
+    <a class="btn btn-ghost btn-sm" href="/login.html" id="navLogin">Sign In</a>
     <button class="btn btn-primary btn-sm" onclick="showView('app')">Launch App →</button>
   </div>
 </nav>
@@ -551,7 +555,9 @@
 
   <footer>
     Built by <a href="https://github.com/gydalimunthe" target="_blank">Gilang Dalimunthe</a> ·
-    <a href="https://github.com/gydalimunthe/career_ops" target="_blank">Open source on GitHub</a>
+    <a href="https://github.com/gydalimunthe/career_ops" target="_blank">Open source on GitHub</a> ·
+    <a href="/privacy.html">Privacy</a> ·
+    <a href="/tos.html">Terms</a>
   </footer>
 </div>
 
@@ -693,12 +699,21 @@
 // ═══════════════════════════════
 //  STATE
 // ═══════════════════════════════
-const MINIMAX_KEY = 'sk-cp-TaWMLUmf-F0mQiDp7az0uuSGMFcg0CBd6GcSEXXf96qhqn8_PaYOLrHw7sxVJkfvr0sQ82w8_GufekJJryl1azDWKIQwaLGPAYcrwiIYybsE02eCpk_eENA';
-const MINIMAX_URL = 'https://api.minimax.io/v1/chat/completions';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let jobs    = [];
 let running = false;
 let profile = JSON.parse(localStorage.getItem('co_profile') || '{}');
+let currentUser = null;
+
+// Check auth state — show dashboard link if logged in
+sb.auth.getSession().then(({ data }) => {
+  if (data.session) {
+    currentUser = data.session.user;
+    document.getElementById('navDashboard').style.display = 'inline-flex';
+    document.getElementById('navLogin').style.display = 'none';
+  }
+});
 
 // ═══════════════════════════════
 //  VIEWS
@@ -918,6 +933,8 @@ async function evalJob(job) {
     const res = await callAI(prompt);
     job.result = parseResult(res);
     job.status = job.result.recommendation === 'SKIP' ? 'skip' : 'done';
+    // Save to Supabase if user is logged in
+    if (currentUser) await saveEvaluation(job);
   } catch (e) {
     job.status = 'pending';
     console.error(e);
@@ -1005,6 +1022,27 @@ async function callAI(prompt) {
 
   const data = await response.json();
   return data.choices[0].message.content;
+}
+
+async function saveEvaluation(job) {
+  const r = job.result;
+  const { error } = await sb.from('evaluations').insert({
+    user_id:        currentUser.id,
+    job_title:      job.title,
+    job_desc:       job.desc.slice(0, 2000), // trim long JDs
+    grade:          r.grade,
+    summary:        r.summary,
+    cv_match:       r.cvMatch,
+    alignment:      r.alignment,
+    comp:           r.comp,
+    culture:        r.culture,
+    red_flags:      r.redFlags,
+    recommendation: r.recommendation,
+    rec_reason:     r.recReason,
+    pitch:          r.pitch || null,
+  });
+  if (error) console.warn('Could not save to Supabase:', error.message);
+  else toast('Saved to your history ✓', 'success');
 }
 
 function parseResult(text) {
