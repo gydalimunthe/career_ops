@@ -9,3 +9,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // MiniMax AI
 const MINIMAX_KEY = 'sk-cp-TaWMLUmf-F0mQiDp7az0uuSGMFcg0CBd6GcSEXXf96qhqn8_PaYOLrHw7sxVJkfvr0sQ82w8_GufekJJryl1azDWKIQwaLGPAYcrwiIYybsE02eCpk_eENA';
 const MINIMAX_URL = 'https://api.minimax.io/v1/chat/completions';
+
+// Base URL — works on GitHub Pages /career_ops/ and localhost
+const BASE_URL = window.location.origin + '/' + (window.location.pathname.split('/')[1] || '');

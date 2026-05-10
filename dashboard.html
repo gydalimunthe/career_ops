@@ -6,7 +6,7 @@
 <title>Dashboard — Career-Ops</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/js/config.js"></script>
+<script src="./js/config.js"></script>
 <style>
   :root{--bg:#080810;--bg2:#0d0d1a;--card:#13131f;--border:#1e1e35;--purple:#8b5cf6;--cyan:#06b6d4;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--text:#e2e8f0;--dim:#94a3b8;--faint:#475569}
   *{margin:0;padding:0;box-sizing:border-box}
@@ -103,13 +103,13 @@
 <body>
 
 <nav>
-  <a class="logo" href="/">⚡ Career-Ops</a>
+  <a class="logo" href="./index.html">⚡ Career-Ops</a>
   <div class="nav-right">
     <div class="user-pill">
       <div class="avatar" id="avatarInitial">?</div>
       <span id="userEmail">Loading…</span>
     </div>
-    <a class="btn btn-primary" href="/app.html">+ Evaluate Jobs</a>
+    <a class="btn btn-primary" href="./app.html">+ Evaluate Jobs</a>
     <button class="btn btn-ghost" onclick="handleSignOut()">Sign Out</button>
   </div>
 </nav>
@@ -191,7 +191,7 @@ let user = null;
 // ── AUTH CHECK ──
 async function init() {
   const { data } = await sb.auth.getSession();
-  if (!data.session) { window.location.href = '/login.html'; return; }
+  if (!data.session) { window.location.href = BASE_URL + '/login.html'; return; }
   user = data.session.user;
 
   // Set greeting
@@ -253,7 +253,7 @@ function renderHistory() {
         <div class="empty-icon">📋</div>
         <h3>No evaluations yet</h3>
         <p>Head to the app, paste a job description, and evaluate your first role.</p>
-        <a class="btn btn-primary" href="/app.html">+ Evaluate a Job</a>
+        <a class="btn btn-primary" href="./app.html">+ Evaluate a Job</a>
       </div>`;
     return;
   }
@@ -343,7 +343,7 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 async function handleSignOut() {
   await sb.auth.signOut();
-  window.location.href = '/login.html';
+  window.location.href = BASE_URL + '/login.html';
 }
 
 init();

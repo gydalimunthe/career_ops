@@ -6,7 +6,7 @@
 <title>Verify Email — Career-Ops</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/js/config.js"></script>
+<script src="./js/config.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Inter',sans-serif;background:#080810;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
@@ -21,7 +21,7 @@
 </style>
 </head>
 <body>
-  <a class="logo" href="/">⚡ Career-Ops</a>
+  <a class="logo" href="./index.html">⚡ Career-Ops</a>
   <div id="state-loading">
     <div class="spinner"></div>
     <h1>Verifying your email…</h1>
@@ -31,13 +31,13 @@
     <div class="icon">✅</div>
     <h1>Email verified!</h1>
     <p>Your account is ready. Let's start evaluating jobs.</p>
-    <a class="btn" href="/dashboard.html">Go to Dashboard →</a>
+    <a class="btn" href="./dashboard.html">Go to Dashboard →</a>
   </div>
   <div id="state-error" style="display:none">
     <div class="icon">❌</div>
     <h1>Verification failed</h1>
     <p id="error-detail">The link may have expired. Request a new one from the login page.</p>
-    <a class="btn" href="/login.html">Back to Sign In</a>
+    <a class="btn" href="./login.html">Back to Sign In</a>
   </div>
 
 <script>
@@ -48,7 +48,7 @@ supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' && session) {
     document.getElementById('state-success').style.display = 'block';
   } else if (event === 'PASSWORD_RECOVERY') {
-    window.location.href = '/reset.html';
+    window.location.href = BASE_URL + '/reset.html';
   } else {
     document.getElementById('state-error').style.display = 'block';
   }
