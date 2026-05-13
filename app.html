@@ -1308,7 +1308,7 @@ ${text.slice(0, 5000)}`;
       body: JSON.stringify({
         model: 'MiniMax-M2.5',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
+        max_tokens: 900,
         temperature: 0.1
       })
     });
@@ -1320,7 +1320,28 @@ ${text.slice(0, 5000)}`;
     raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
-    const data = JSON.parse(raw);
+    // Auto-repair truncated JSON by closing any open braces/brackets/strings
+    let jsonStr = raw;
+    try { JSON.parse(jsonStr); } catch(_) {
+      // Close any unterminated string first
+      const lastQuote = jsonStr.lastIndexOf('"');
+      const prevQuote = jsonStr.lastIndexOf('"', lastQuote - 1);
+      if (lastQuote > prevQuote && (jsonStr.match(/"/g)||[]).length % 2 !== 0) {
+        jsonStr += '"';
+      }
+      // Close open braces
+      let depth = 0;
+      let inStr = false, esc = false;
+      for (const ch of jsonStr) {
+        if (esc) { esc = false; continue; }
+        if (ch === '\\' && inStr) { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (!inStr) { if (ch === '{') depth++; else if (ch === '}') depth--; }
+      }
+      while (depth-- > 0) jsonStr += '}';
+    }
+
+    const data = JSON.parse(jsonStr);
 
     if (data.background)  document.getElementById('profileBg').value    = data.background;
     if (data.targetRoles) document.getElementById('targetRoles').value  = data.targetRoles;
