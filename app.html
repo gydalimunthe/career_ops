@@ -248,6 +248,12 @@
     font-weight: 600; cursor: pointer; font-size: 13px; transition: all .2s;
   }
   .btn-add-job:hover { background: rgba(139,92,246,.25); border-style: solid; }
+  .bookmarklet-hint { margin-top: 12px; padding: 10px 14px; background: rgba(139,92,246,.06); border: 1px dashed rgba(139,92,246,.3); border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bookmarklet-hint span { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 160px; line-height: 1.5; }
+  .bookmarklet-drag { display: inline-block; padding: 6px 14px; background: linear-gradient(135deg,#8b5cf6,#06b6d4); color: #fff; border-radius: 7px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: grab; white-space: nowrap; user-select: none; letter-spacing:.01em; }
+  .bookmarklet-drag:active { cursor: grabbing; opacity:.85; }
+  .li-imported { animation: flash-in .5s ease; }
+  @keyframes flash-in { 0%{background:rgba(139,92,246,.25)} 100%{background:transparent} }
 
   /* JOB QUEUE */
   .queue-header {
@@ -644,6 +650,10 @@
           <textarea id="newJobDesc" rows="6" placeholder="Paste the complete job description here — from LinkedIn, Indeed, company site, anywhere…"></textarea>
         </div>
         <button class="btn-add-job" onclick="addJob()">+ Add to Queue</button>
+        <div class="bookmarklet-hint">
+          <span>🔖 <strong style="color:var(--text)">LinkedIn shortcut</strong> — drag this button to your bookmarks bar, then click it on any LinkedIn job page to auto-fill:</span>
+          <a class="bookmarklet-drag" href="javascript:(function(){var q=function(s){return document.querySelector(s)};var t=function(s){var e=q(s);return e?(e.innerText||'').trim():''};var title=t('h1.job-details-jobs-unified-top-card__job-title-link')||t('.job-details-jobs-unified-top-card__job-title h1')||t('.jobs-unified-top-card__job-title h1')||t('h1');var company=t('.job-details-jobs-unified-top-card__company-name a')||t('.jobs-unified-top-card__company-name a')||t('[class*=&quot;top-card__company-name&quot;] a');var desc=t('#job-details')||t('.jobs-description__content .jobs-description-content__text')||t('.jobs-description__content')||t('[class*=&quot;description__content&quot;]');if(!desc){alert('Career-Ops: No job description found. Make sure you are on a LinkedIn job page (linkedin.com/jobs/view/...).');return;}var label=[title,company].filter(Boolean).join(' — ');window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:label.trim(),desc:desc.trim()})),'_blank');})();" title="Drag me to your bookmarks bar!">⚡ Evaluate on Career-Ops</a>
+        </div>
       </div>
 
       <!-- RUN BAR -->
@@ -1206,6 +1216,23 @@ function closeModal(id) {
 //  INIT
 // ═══════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // ── LinkedIn bookmarklet import ──
+  const _hash = window.location.hash;
+  if (_hash.startsWith('#li=')) {
+    try {
+      const _data = JSON.parse(decodeURIComponent(_hash.slice(4)));
+      if (_data.title) document.getElementById('newJobTitle').value = _data.title;
+      if (_data.desc)  document.getElementById('newJobDesc').value  = _data.desc;
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      // Switch to app tab and scroll to the form
+      showView('app');
+      setTimeout(() => {
+        const panel = document.querySelector('.job-input-area');
+        if (panel) { panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); panel.classList.add('li-imported'); setTimeout(() => panel.classList.remove('li-imported'), 600); }
+      }, 200);
+    } catch(e) { console.warn('Career-Ops: Could not parse LinkedIn import', e); }
+  }
+
   // Show onboarding if no profile yet
   if (!profile.bg) {
     setTimeout(() => {
