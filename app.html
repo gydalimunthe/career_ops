@@ -542,7 +542,7 @@
         <div class="bm-sub">Select the job description text on any job page, then click it — works on LinkedIn, Indeed, Glassdoor, company sites, anywhere.</div>
       </div>
       <div class="bm-right">
-        <a class="bookmarklet-drag bm-big" href="javascript:(function(){var sel=(window.getSelection()||{}).toString().trim();var q=function(s){var e=document.querySelector(s);return e?(e.innerText||'').trim():''};var h1=q('h1')||document.title;if(sel&&sel.length>80){window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1,desc:sel})),'_blank');return;}var desc=q('#job-details')||q('.jobs-description__content')||q('.jobs-description-content__text')||q('[class*=jobs-description]')||q('[class*=description-content]')||'';if(!desc||desc.length<80){var best='';document.querySelectorAll('div,section,article').forEach(function(el){var c=(el.className||'').toLowerCase(),id=(el.id||'').toLowerCase(),tx=(el.innerText||'').trim();if(tx.length>best.length&&tx.length>200&&(c.indexOf('description')>-1||id.indexOf('description')>-1)){best=tx;}});if(best)desc=best;}if(desc&&desc.length>80){window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1,desc:desc})),'_blank');return;}alert('Select the job description text on the page, then click this bookmark again.');})();" title="Drag me to your bookmarks bar!">⚡ Evaluate on Career-Ops</a>
+        <a class="bookmarklet-drag bm-big" href="javascript:(function(){var q=function(s){var e=document.querySelector(s);return e?(e.innerText||'').trim():''};var desc=q('#job-details')||q('.jobs-description__content')||q('.jobs-description-content__text')||q('[class*=jobs-description]')||q('[class*=description-content]')||'';if(!desc||desc.length<120){var kws=['responsibilities','requirements','qualifications','experience','skills','preferred','we are looking','about the role','what you will','minimum qualifications','basic qualifications','nice to have','you will be','you will have','the role','job summary','position summary'];var best='',bestScore=-1;document.querySelectorAll('div,section,article,main').forEach(function(el){var tx=(el.innerText||'').trim();if(tx.length<120||tx.length>18000)return;var cls=(el.className||'').toLowerCase();if(cls.indexOf('nav')>-1||cls.indexOf('header')>-1||cls.indexOf('comment')>-1||cls.indexOf('sidebar')>-1)return;var score=0,low=tx.toLowerCase();kws.forEach(function(k){if(low.indexOf(k)>-1)score++;});if(score>bestScore||(score===bestScore&&tx.length>best.length)){bestScore=score;best=tx;}});if(best)desc=best;}if(!desc||desc.length<100){alert('Career-Ops: Could not read this page. Make sure the job description has fully loaded and try again.');return;}var h1=q('h1')||document.title||'';window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1.trim(),desc:desc.trim().slice(0,9000),raw:true})),'_blank');})();" title="Drag me to your bookmarks bar!">⚡ Evaluate on Career-Ops</a>
         <div style="font-size:11px;color:var(--text-faint);margin-top:8px;text-align:center">↑ drag this button to your bookmarks bar</div>
       </div>
     </div>
@@ -686,7 +686,7 @@
         <button class="btn-add-job" onclick="addJob()">+ Add to Queue</button>
         <div class="bookmarklet-hint">
           <span>🔖 <strong style="color:var(--text)">One-click import</strong> — drag to bookmarks bar. On any job page: <strong style="color:var(--text)">select the description text first</strong>, then click the bookmark. Works on LinkedIn, Indeed, Glassdoor, anywhere.</span>
-          <a class="bookmarklet-drag" href="javascript:(function(){var sel=(window.getSelection()||{}).toString().trim();var q=function(s){var e=document.querySelector(s);return e?(e.innerText||'').trim():''};var h1=q('h1')||document.title;if(sel&&sel.length>80){window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1,desc:sel})),'_blank');return;}var desc=q('#job-details')||q('.jobs-description__content')||q('.jobs-description-content__text')||q('[class*=jobs-description]')||q('[class*=description-content]')||'';if(!desc||desc.length<80){var best='';document.querySelectorAll('div,section,article').forEach(function(el){var c=(el.className||'').toLowerCase(),id=(el.id||'').toLowerCase(),tx=(el.innerText||'').trim();if(tx.length>best.length&&tx.length>200&&(c.indexOf('description')>-1||id.indexOf('description')>-1)){best=tx;}});if(best)desc=best;}if(desc&&desc.length>80){window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1,desc:desc})),'_blank');return;}alert('Select the job description text on the page, then click this bookmark again.');})();" title="Drag me to your bookmarks bar!">⚡ Evaluate on Career-Ops</a>
+          <a class="bookmarklet-drag" href="javascript:(function(){var q=function(s){var e=document.querySelector(s);return e?(e.innerText||'').trim():''};var desc=q('#job-details')||q('.jobs-description__content')||q('.jobs-description-content__text')||q('[class*=jobs-description]')||q('[class*=description-content]')||'';if(!desc||desc.length<120){var kws=['responsibilities','requirements','qualifications','experience','skills','preferred','we are looking','about the role','what you will','minimum qualifications','basic qualifications','nice to have','you will be','you will have','the role','job summary','position summary'];var best='',bestScore=-1;document.querySelectorAll('div,section,article,main').forEach(function(el){var tx=(el.innerText||'').trim();if(tx.length<120||tx.length>18000)return;var cls=(el.className||'').toLowerCase();if(cls.indexOf('nav')>-1||cls.indexOf('header')>-1||cls.indexOf('comment')>-1||cls.indexOf('sidebar')>-1)return;var score=0,low=tx.toLowerCase();kws.forEach(function(k){if(low.indexOf(k)>-1)score++;});if(score>bestScore||(score===bestScore&&tx.length>best.length)){bestScore=score;best=tx;}});if(best)desc=best;}if(!desc||desc.length<100){alert('Career-Ops: Could not read this page. Make sure the job description has fully loaded and try again.');return;}var h1=q('h1')||document.title||'';window.open('https://gydalimunthe.github.io/career_ops/app.html#li='+encodeURIComponent(JSON.stringify({title:h1.trim(),desc:desc.trim().slice(0,9000),raw:true})),'_blank');})();" title="Drag me to your bookmarks bar!">⚡ Evaluate on Career-Ops</a>
         </div>
       </div>
 
@@ -1374,16 +1374,49 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_hash.startsWith('#li=')) {
     try {
       const _data = JSON.parse(decodeURIComponent(_hash.slice(4)));
-      if (_data.title) document.getElementById('newJobTitle').value = _data.title;
-      if (_data.desc)  document.getElementById('newJobDesc').value  = _data.desc;
       history.replaceState(null, '', window.location.pathname + window.location.search);
-      // Switch to app tab and scroll to the form
       showView('app');
-      setTimeout(() => {
+      setTimeout(async () => {
         const panel = document.querySelector('.job-input-area');
         if (panel) { panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); panel.classList.add('li-imported'); setTimeout(() => panel.classList.remove('li-imported'), 600); }
+        const titleEl = document.getElementById('newJobTitle');
+        const descEl  = document.getElementById('newJobDesc');
+        // Show raw content immediately
+        if (_data.title) titleEl.value = _data.title;
+        if (_data.desc)  descEl.value  = _data.desc;
+        // AI clean + summarize if flagged as raw
+        if (_data.raw && _data.desc) {
+          descEl.value = '⏳ Reading job description…';
+          titleEl.disabled = descEl.disabled = true;
+          try {
+            const _res = await fetch(MINIMAX_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_KEY}` },
+              body: JSON.stringify({
+                model: 'MiniMax-M2.5',
+                messages: [{ role: 'user', content: `Extract the job title and clean job description from this raw page text. Return ONLY valid JSON with two keys:
+{"title":"<job title and company>","desc":"<clean full job description only, no navigation or unrelated text>"}
+
+Raw text:
+${_data.desc.slice(0,7000)}` }],
+                max_tokens: 1200, temperature: 0.1
+              })
+            });
+            const _json = await _res.json();
+            let _raw = (_json.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
+            const _parsed = JSON.parse(_raw);
+            if (_parsed.title) titleEl.value = _parsed.title;
+            if (_parsed.desc)  descEl.value  = _parsed.desc;
+          } catch(_e) {
+            // Fall back to raw content on AI failure
+            if (_data.title) titleEl.value = _data.title;
+            if (_data.desc)  descEl.value  = _data.desc;
+          } finally {
+            titleEl.disabled = descEl.disabled = false;
+          }
+        }
       }, 200);
-    } catch(e) { console.warn('Career-Ops: Could not parse LinkedIn import', e); }
+    } catch(e) { console.warn('Career-Ops: Could not parse import', e); }
   }
 
   // Show onboarding if no profile yet
