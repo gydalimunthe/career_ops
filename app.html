@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="./js/config.js"></script>
 <style>
   :root {
@@ -260,6 +261,11 @@
   .bm-right { display: flex; flex-direction: column; align-items: center; }
   .li-imported { animation: flash-in .5s ease; }
   @keyframes flash-in { 0%{background:rgba(139,92,246,.25)} 100%{background:transparent} }
+  .pdf-upload-wrap { margin-bottom: 14px; }
+  .pdf-upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 14px; background: rgba(139,92,246,.1); border: 1px dashed rgba(139,92,246,.4); border-radius: 8px; font-size: 13px; font-weight: 600; color: #a78bfa; cursor: pointer; transition: all .2s; }
+  .pdf-upload-btn:hover { background: rgba(139,92,246,.18); border-color: #8b5cf6; color: #c4b5fd; }
+  .pdf-upload-btn.loading { opacity: .7; cursor: not-allowed; pointer-events: none; }
+  .pdf-status { font-size: 12px; margin-top: 7px; padding: 7px 10px; border-radius: 6px; background: rgba(139,92,246,.07); text-align: center; }
 
   /* JOB QUEUE */
   .queue-header {
@@ -613,6 +619,13 @@
       <!-- PROFILE -->
       <div class="panel">
         <div class="panel-title">👤 Your Profile</div>
+        <div class="pdf-upload-wrap">
+          <label class="pdf-upload-btn" id="pdfLabel" for="pdfInput">
+            <span>📄</span> Import from Resume PDF
+          </label>
+          <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="importFromPDF(this)">
+          <div class="pdf-status" id="pdfStatus" style="display:none"></div>
+        </div>
         <div class="form-group">
           <label>Your background / CV summary</label>
           <textarea id="profileBg" rows="5" placeholder="e.g. 3 years as PM at B2B SaaS, led ERP implementation managing 1,000+ SKUs, co-founded an EdTech startup scaled to 100K users…"></textarea>
@@ -1236,6 +1249,100 @@ function closeModal(id) {
 // ═══════════════════════════════
 //  INIT
 // ═══════════════════════════════
+// ── PDF Resume Import ──
+async function importFromPDF(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const label  = document.getElementById('pdfLabel');
+  const status = document.getElementById('pdfStatus');
+
+  const setStatus = (msg, color) => {
+    status.style.display = 'block';
+    status.style.color = color || 'var(--text-dim)';
+    status.textContent = msg;
+  };
+
+  label.classList.add('loading');
+  label.innerHTML = '<span>⏳</span> Reading PDF…';
+  setStatus('📄 Extracting text from PDF…');
+
+  try {
+    // Set PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let text = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n';
+    }
+
+    if (!text.trim()) throw new Error('No text found in PDF');
+
+    setStatus('🤖 AI is reading your resume…');
+
+    const prompt = `You are a resume parser. Extract information from the resume text below and return ONLY a valid JSON object with these exact keys — no extra text, no markdown:
+{
+  "background": "concise 2-3 sentence professional summary covering experience, key skills, and notable achievements",
+  "targetRoles": "comma-separated job titles this person is suited for",
+  "salaryRange": "estimated salary range based on seniority (e.g. $80K-$120K), or empty string if unclear",
+  "visa": "one of exactly: citizen | opt | h1b | other",
+  "dealBreakers": "any stated preferences or constraints worth noting, or empty string"
+}
+
+Resume:
+${text.slice(0, 5000)}`;
+
+    const res = await fetch(MINIMAX_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_KEY}` },
+      body: JSON.stringify({
+        model: 'MiniMax-M2.5',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        temperature: 0.1
+      })
+    });
+
+    const json = await res.json();
+    let raw = json.choices[0].message.content;
+
+    // Strip <think> blocks and code fences
+    raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const data = JSON.parse(raw);
+
+    if (data.background)  document.getElementById('profileBg').value    = data.background;
+    if (data.targetRoles) document.getElementById('targetRoles').value  = data.targetRoles;
+    if (data.salaryRange) document.getElementById('salaryRange').value  = data.salaryRange;
+    if (data.visa) {
+      const sel = document.getElementById('visaStatus');
+      const match = ['citizen','opt','h1b','other'].includes(data.visa) ? data.visa : 'other';
+      sel.value = match;
+    }
+    if (data.dealBreakers) document.getElementById('dealBreakers').value = data.dealBreakers;
+
+    saveProfile();
+
+    setStatus('✓ Profile filled from your resume!', '#6ee7b7');
+    setTimeout(() => { status.style.display = 'none'; status.style.color = ''; }, 4000);
+
+  } catch(e) {
+    console.error('PDF import error:', e);
+    setStatus('✗ Could not parse PDF — try again or fill manually', '#fca5a5');
+  } finally {
+    label.classList.remove('loading');
+    label.innerHTML = '<span>📄</span> Import from Resume PDF';
+    input.value = '';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // ── LinkedIn bookmarklet import ──
   const _hash = window.location.hash;
