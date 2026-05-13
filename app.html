@@ -1376,44 +1376,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const _data = JSON.parse(decodeURIComponent(_hash.slice(4)));
       history.replaceState(null, '', window.location.pathname + window.location.search);
       showView('app');
-      setTimeout(async () => {
+      setTimeout(() => {
+        if (_data.title) document.getElementById('newJobTitle').value = _data.title;
+        if (_data.desc)  document.getElementById('newJobDesc').value  = _data.desc;
         const panel = document.querySelector('.job-input-area');
-        if (panel) { panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); panel.classList.add('li-imported'); setTimeout(() => panel.classList.remove('li-imported'), 600); }
-        const titleEl = document.getElementById('newJobTitle');
-        const descEl  = document.getElementById('newJobDesc');
-        // Show raw content immediately
-        if (_data.title) titleEl.value = _data.title;
-        if (_data.desc)  descEl.value  = _data.desc;
-        // AI clean + summarize if flagged as raw
-        if (_data.raw && _data.desc) {
-          descEl.value = '⏳ Reading job description…';
-          titleEl.disabled = descEl.disabled = true;
-          try {
-            const _res = await fetch(MINIMAX_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_KEY}` },
-              body: JSON.stringify({
-                model: 'MiniMax-M2.5',
-                messages: [{ role: 'user', content: `Extract the job title and clean job description from this raw page text. Return ONLY valid JSON with two keys:
-{"title":"<job title and company>","desc":"<clean full job description only, no navigation or unrelated text>"}
-
-Raw text:
-${_data.desc.slice(0,7000)}` }],
-                max_tokens: 1200, temperature: 0.1
-              })
-            });
-            const _json = await _res.json();
-            let _raw = (_json.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
-            const _parsed = JSON.parse(_raw);
-            if (_parsed.title) titleEl.value = _parsed.title;
-            if (_parsed.desc)  descEl.value  = _parsed.desc;
-          } catch(_e) {
-            // Fall back to raw content on AI failure
-            if (_data.title) titleEl.value = _data.title;
-            if (_data.desc)  descEl.value  = _data.desc;
-          } finally {
-            titleEl.disabled = descEl.disabled = false;
-          }
+        if (panel) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          panel.classList.add('li-imported');
+          setTimeout(() => panel.classList.remove('li-imported'), 600);
         }
       }, 200);
     } catch(e) { console.warn('Career-Ops: Could not parse import', e); }
