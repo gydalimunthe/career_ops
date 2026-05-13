@@ -1,0 +1,24 @@
+{
+  "name": "portfolio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "live-server --port=3000 --open=app.html --ignore=node_modules"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gydalimunthe/career_ops.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gydalimunthe/career_ops/issues"
+  },
+  "homepage": "https://github.com/gydalimunthe/career_ops#readme",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

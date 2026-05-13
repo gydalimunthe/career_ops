@@ -11,4 +11,7 @@ const MINIMAX_KEY = 'sk-cp-TaWMLUmf-F0mQiDp7az0uuSGMFcg0CBd6GcSEXXf96qhqn8_PaYOL
 const MINIMAX_URL = 'https://api.minimax.io/v1/chat/completions';
 
 // Base URL — works on GitHub Pages /career_ops/ and localhost
-const BASE_URL = window.location.origin + '/' + (window.location.pathname.split('/')[1] || '');
+const _isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+const BASE_URL = _isLocal
+  ? window.location.origin
+  : window.location.origin + '/' + (window.location.pathname.split('/')[1] || '');
