@@ -261,6 +261,12 @@
   .bm-right { display: flex; flex-direction: column; align-items: center; }
   .li-imported { animation: flash-in .5s ease; }
   @keyframes flash-in { 0%{background:rgba(139,92,246,.25)} 100%{background:transparent} }
+  .url-fetch-row { display:flex; gap:8px; }
+  .url-fetch-row input { flex:1; }
+  .btn-fetch { padding:9px 16px; background:linear-gradient(135deg,#8b5cf6,#06b6d4); color:#fff; border:none; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; white-space:nowrap; transition:opacity .2s; font-family:'Inter',sans-serif; }
+  .btn-fetch:hover { opacity:.9; }
+  .btn-fetch:disabled { opacity:.5; cursor:not-allowed; }
+  .fetch-status { font-size:12px; margin-top:6px; padding:6px 10px; border-radius:6px; background:rgba(139,92,246,.07); }
   .pdf-upload-wrap { margin-bottom: 14px; }
   .pdf-upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 14px; background: rgba(139,92,246,.1); border: 1px dashed rgba(139,92,246,.4); border-radius: 8px; font-size: 13px; font-weight: 600; color: #a78bfa; cursor: pointer; transition: all .2s; }
   .pdf-upload-btn:hover { background: rgba(139,92,246,.18); border-color: #8b5cf6; color: #c4b5fd; }
@@ -676,12 +682,20 @@
       <div class="panel job-input-area">
         <div class="panel-title">➕ Add Job</div>
         <div class="form-group">
+          <label>Import from URL</label>
+          <div class="url-fetch-row">
+            <input type="url" id="jobUrl" placeholder="Paste a LinkedIn, Indeed, or any job URL…" autocomplete="off">
+            <button class="btn-fetch" id="fetchBtn" onclick="fetchFromUrl()">Fetch</button>
+          </div>
+          <div class="fetch-status" id="fetchStatus" style="display:none"></div>
+        </div>
+        <div class="form-group">
           <label>Job Title & Company (optional)</label>
           <input type="text" id="newJobTitle" placeholder="e.g. Product Manager — Stripe">
         </div>
         <div class="form-group">
-          <label>Paste Full Job Description</label>
-          <textarea id="newJobDesc" rows="6" placeholder="Paste the complete job description here — from LinkedIn, Indeed, company site, anywhere…"></textarea>
+          <label>Or Paste Full Job Description</label>
+          <textarea id="newJobDesc" rows="5" placeholder="Paste the complete job description here — from LinkedIn, Indeed, company site, anywhere…"></textarea>
         </div>
         <button class="btn-add-job" onclick="addJob()">+ Add to Queue</button>
         <div class="bookmarklet-hint">
@@ -1256,6 +1270,117 @@ function closeModal(id) {
 // ═══════════════════════════════
 //  INIT
 // ═══════════════════════════════
+// ── URL Job Fetch ──
+async function fetchFromUrl() {
+  const urlInput = document.getElementById('jobUrl');
+  const fetchBtn = document.getElementById('fetchBtn');
+  const statusEl = document.getElementById('fetchStatus');
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  const setStatus = (msg, color) => {
+    statusEl.style.display = 'block';
+    statusEl.style.color = color || 'var(--text-dim)';
+    statusEl.textContent = msg;
+  };
+
+  fetchBtn.disabled = true;
+  fetchBtn.textContent = '…';
+  setStatus('⏳ Fetching job page…');
+
+  try {
+    let html = '';
+
+    // LinkedIn: use guest job API for cleaner extraction
+    const liMatch = url.match(/linkedin\.com\/jobs\/view\/(\d+)/);
+    if (liMatch) {
+      const liUrl = `https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/${liMatch[1]}`;
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(liUrl)}`;
+      const r = await fetch(proxy);
+      const j = await r.json();
+      html = j.contents || '';
+    } else {
+      // Generic: fetch via CORS proxy
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const r = await fetch(proxy);
+      const j = await r.json();
+      html = j.contents || '';
+    }
+
+    if (!html) throw new Error('Empty response from proxy');
+
+    // Parse HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Try JSON-LD first (most reliable, used by LinkedIn & many job boards)
+    let title = '', desc = '';
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+      try {
+        const d = JSON.parse(s.textContent);
+        const jp = Array.isArray(d) ? d.find(x => x['@type'] === 'JobPosting') : (d['@type'] === 'JobPosting' ? d : null);
+        if (jp) {
+          title = title || (jp.title || '') + (jp.hiringOrganization?.name ? ' — ' + jp.hiringOrganization.name : '');
+          desc  = desc  || (jp.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+      } catch(_) {}
+    });
+
+    // Fallback: scrape common selectors
+    if (!desc) {
+      const sel = ['#job-details','.jobs-description__content','.jobDescriptionText',
+                   '[class*=job-description]','[class*=jobDescription]','[itemprop=description]',
+                   'article','main'];
+      for (const s of sel) {
+        const el = doc.querySelector(s);
+        if (el) { desc = el.innerText || el.textContent || ''; desc = desc.trim(); if (desc.length > 100) break; }
+      }
+    }
+
+    // Fallback: let MiniMax extract from raw HTML text
+    if (!desc || desc.length < 100) {
+      setStatus('🤖 Asking AI to extract description…');
+      const bodyText = (doc.body?.innerText || doc.body?.textContent || '').slice(0, 6000);
+      const r2 = await fetch(MINIMAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_KEY}` },
+        body: JSON.stringify({
+          model: 'MiniMax-M2.5',
+          messages: [{ role: 'user', content: `Extract job title and full job description from this page text. Return ONLY JSON: {"title":"...","desc":"..."}\n\n${bodyText}` }],
+          max_tokens: 1000, temperature: 0.1
+        })
+      });
+      const rj = await r2.json();
+      let raw = (rj.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```json\s*/i,'').replace(/\s*```$/i,'').trim();
+      const parsed = JSON.parse(raw);
+      title = title || parsed.title || '';
+      desc  = parsed.desc  || desc;
+    }
+
+    if (!desc || desc.length < 80) throw new Error('Could not find job description on this page');
+
+    // Fill form
+    if (title) document.getElementById('newJobTitle').value = title.trim();
+    document.getElementById('newJobDesc').value = desc.trim();
+    urlInput.value = '';
+    setStatus('✓ Job description loaded!', '#6ee7b7');
+    setTimeout(() => { statusEl.style.display = 'none'; statusEl.style.color = ''; }, 3000);
+
+  } catch(e) {
+    console.error('fetchFromUrl:', e);
+    setStatus('✗ ' + (e.message || 'Failed to fetch — try pasting the description manually'), '#fca5a5');
+  } finally {
+    fetchBtn.disabled = false;
+    fetchBtn.textContent = 'Fetch';
+  }
+}
+
+// Allow Enter key in URL field
+document.addEventListener('DOMContentLoaded', () => {
+  const urlEl = document.getElementById('jobUrl');
+  if (urlEl) urlEl.addEventListener('keydown', e => { if (e.key === 'Enter') fetchFromUrl(); });
+});
+
 // ── PDF Resume Import ──
 async function importFromPDF(input) {
   const file = input.files[0];
