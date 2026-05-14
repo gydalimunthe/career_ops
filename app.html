@@ -1110,37 +1110,43 @@ async function saveEvaluation(job) {
   else toast('Saved to your history ✓', 'success');
 }
 
-function parseResult(text) {
-  // 1. Strip <think>...</think> reasoning blocks (MiniMax M2.7 reasoning model)
-  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-  // 2. Strip markdown code fences
-  cleaned = cleaned
-    .replace(/```json\s*/gi, '')
-    .replace(/```\s*/g, '')
-    .trim();
-
-  // 3. Find the JSON object
-  const start = cleaned.indexOf('{');
-  if (start === -1) {
-    console.error('Raw AI response:', text);
-    throw new Error('No JSON found in response');
+// ── Shared MiniMax JSON parser (strips think blocks, repairs truncation) ──
+function cleanMiniMaxJSON(text) {
+  let s = (text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  s = s.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  const start = s.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in AI response');
+  let js = s.slice(start);
+  // Auto-repair: close open strings and braces
+  let depth = 0, inStr = false, esc = false;
+  for (const ch of js) {
+    if (esc)  { esc = false; continue; }
+    if (ch === '\\' && inStr) { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (!inStr) { if (ch === '{') depth++; else if (ch === '}') depth--; }
   }
+  if (inStr) js += '"';
+  while (depth-- > 0) js += '}';
+  return JSON.parse(js);
+}
+
+function parseResult(text) {
+  const cleaned = (text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+    .replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  const start = cleaned.indexOf('{');
+  if (start === -1) { console.error('Raw AI response:', text); throw new Error('No JSON found in response'); }
   let jsonStr = cleaned.slice(start);
 
-  // 4. Auto-repair truncated JSON (add missing closing braces)
-  let depth = 0;
-  let inStr = false, escape = false;
+  // Auto-repair truncated JSON
+  let depth = 0, inStr = false, escape = false;
   for (const ch of jsonStr) {
     if (escape) { escape = false; continue; }
     if (ch === '\\' && inStr) { escape = true; continue; }
     if (ch === '"') { inStr = !inStr; continue; }
-    if (!inStr) {
-      if (ch === '{') depth++;
-      else if (ch === '}') depth--;
-    }
+    if (!inStr) { if (ch === '{') depth++; else if (ch === '}') depth--; }
   }
-  // Close any unclosed string + braces
   if (inStr) jsonStr += '"';
   while (depth > 0) { jsonStr += '}'; depth--; }
 
@@ -1372,13 +1378,12 @@ async function fetchFromUrl() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_KEY}` },
         body: JSON.stringify({
           model: 'MiniMax-M2.5',
-          messages: [{ role: 'user', content: `Extract job title and full job description from this page text. Return ONLY JSON: {"title":"...","desc":"..."}\n\n${bodyText}` }],
-          max_tokens: 1000, temperature: 0.1
+          messages: [{ role: 'user', content: `Extract the job title and full job description from this page text. Return ONLY valid JSON with exactly these keys:\n{"title":"Job Title — Company Name","desc":"full job description text only, no nav or unrelated content"}\n\nPage text:\n${bodyText}` }],
+          max_tokens: 1400, temperature: 0.1
         })
       });
       const rj = await r2.json();
-      let raw = (rj.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```json\s*/i,'').replace(/\s*```$/i,'').trim();
-      const parsed = JSON.parse(raw);
+      const parsed = cleanMiniMaxJSON(rj.choices[0].message.content || '');
       title = title || parsed.title || '';
       desc  = parsed.desc  || desc;
     }
@@ -1472,34 +1477,7 @@ ${text.slice(0, 5000)}`;
     });
 
     const json = await res.json();
-    let raw = json.choices[0].message.content;
-
-    // Strip <think> blocks and code fences
-    raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-
-    // Auto-repair truncated JSON by closing any open braces/brackets/strings
-    let jsonStr = raw;
-    try { JSON.parse(jsonStr); } catch(_) {
-      // Close any unterminated string first
-      const lastQuote = jsonStr.lastIndexOf('"');
-      const prevQuote = jsonStr.lastIndexOf('"', lastQuote - 1);
-      if (lastQuote > prevQuote && (jsonStr.match(/"/g)||[]).length % 2 !== 0) {
-        jsonStr += '"';
-      }
-      // Close open braces
-      let depth = 0;
-      let inStr = false, esc = false;
-      for (const ch of jsonStr) {
-        if (esc) { esc = false; continue; }
-        if (ch === '\\' && inStr) { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (!inStr) { if (ch === '{') depth++; else if (ch === '}') depth--; }
-      }
-      while (depth-- > 0) jsonStr += '}';
-    }
-
-    const data = JSON.parse(jsonStr);
+    const data = cleanMiniMaxJSON(json.choices[0].message.content || '');
 
     if (data.background)  document.getElementById('profileBg').value    = data.background;
     if (data.targetRoles) document.getElementById('targetRoles').value  = data.targetRoles;
