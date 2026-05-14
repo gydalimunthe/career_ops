@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="./js/config.js"></script>
 <style>
   :root {
@@ -817,7 +818,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('tailorModal')">Close</button>
-      <button class="btn btn-primary btn-sm" id="tailorCopyBtn" style="display:none" onclick="copyTailorReport()">Copy Suggestions</button>
+      <button class="btn btn-primary btn-sm" id="tailorDownloadBtn" style="display:none" onclick="downloadTailoredPDF()">⬇ Download Tailored Resume PDF</button>
     </div>
   </div>
 </div>
@@ -828,9 +829,10 @@
 // ═══════════════════════════════
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let jobs    = JSON.parse(localStorage.getItem('co_jobs') || '[]');
-let running = false;
-let profile = JSON.parse(localStorage.getItem('co_profile') || '{}');
+let jobs       = JSON.parse(localStorage.getItem('co_jobs') || '[]');
+let running    = false;
+let profile    = JSON.parse(localStorage.getItem('co_profile') || '{}');
+let resumeRaw  = localStorage.getItem('co_resume_raw') || '';   // full extracted PDF text
 let currentUser = null;
 
 // Check auth state — show dashboard link if logged in
@@ -1276,62 +1278,89 @@ ${r.pitch ? `## Pitch Angle\n"${r.pitch}"` : ''}
 }
 
 // ═══════════════════════════════
-//  TAILOR RESUME
+//  TAILOR RESUME → PDF
 // ═══════════════════════════════
-let tailorReportText = ''; // for copy button
+let tailorData = null; // structured resume data for PDF generation
+let tailorJobTitle = '';
 
 async function tailorResume(id) {
   const job = jobs.find(j => j.id === id);
   if (!job) return;
 
-  // Open modal in loading state
+  tailorData = null;
+  tailorJobTitle = job.title;
+
   document.getElementById('tailorJobName').textContent = job.title + (job.company ? ` · ${job.company}` : '');
   document.getElementById('tailorBody').innerHTML = `
     <div class="tailor-loading">
       <div class="spinner"></div>
-      Generating tailored suggestions…
+      Building your tailored resume…
     </div>`;
-  document.getElementById('tailorCopyBtn').style.display = 'none';
-  tailorReportText = '';
+  document.getElementById('tailorDownloadBtn').style.display = 'none';
   openModal('tailorModal');
 
-  const p = profile;
-  const prompt = `You are an expert resume coach. A candidate got a "CONSIDER" rating for a job — meaning they're a partial fit and need to strategically tailor their resume to improve their chances.
+  if (!resumeRaw) {
+    document.getElementById('tailorBody').innerHTML = `
+      <div class="tailor-error" style="padding:30px 0;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">📄</div>
+        <div style="font-size:14px;color:var(--text-dim);margin-bottom:6px;">No resume uploaded yet</div>
+        <div style="font-size:12px;color:var(--text-faint);">Upload your resume PDF in the Profile panel first,<br>then come back here to generate a tailored version.</div>
+      </div>`;
+    return;
+  }
 
-## CANDIDATE PROFILE
-${p.bg || '(No background provided)'}
+  const p = profile;
+  const prompt = `You are an expert resume writer. A candidate received a "CONSIDER" rating for the job below — meaning they are a partial fit. Using their original resume text, rewrite their resume to be optimally tailored for this specific role.
+
+## ORIGINAL RESUME TEXT
+${resumeRaw.slice(0, 5000)}
+
+## CANDIDATE PROFILE NOTES
 Target roles: ${p.targetRoles || 'Not specified'}
 Visa/work status: ${p.visa || 'Not specified'}
 
-## JOB TITLE
-${job.title}${job.company ? ` at ${job.company}` : ''}
+## TARGET JOB
+Title: ${job.title}${job.company ? ` at ${job.company}` : ''}
 
 ## JOB DESCRIPTION
-${job.desc.slice(0, 4000)}
+${job.desc.slice(0, 3500)}
 
 ## TASK
-Analyze the gap between the candidate's profile and this job. Return ONLY a JSON object in exactly this format:
+Rewrite the resume to maximise fit for this role. Return ONLY a JSON object in exactly this format:
 
 {
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
-  "skills": ["skill1", "skill2", "skill3", "skill4"],
-  "bullets": [
-    "Rewritten resume bullet 1 that highlights relevant experience for this role",
-    "Rewritten resume bullet 2",
-    "Rewritten resume bullet 3"
+  "name": "candidate full name from resume",
+  "contact": "email | phone | city | linkedin (extract from resume, one line)",
+  "summary": "3-sentence tailored professional summary that directly addresses this role's needs",
+  "skills": ["skill1", "skill2", "skill3", "skill4", "skill5", "skill6", "skill7", "skill8"],
+  "experience": [
+    {
+      "title": "Job Title",
+      "company": "Company Name",
+      "dates": "Mon YYYY – Mon YYYY",
+      "bullets": [
+        "Accomplishment bullet rewritten with JD keywords and strong action verb",
+        "Another bullet with quantified impact if possible",
+        "Third bullet"
+      ]
+    }
   ],
-  "deemphasize": ["thing to remove or downplay 1", "thing to remove or downplay 2"],
-  "angle": "One paragraph (3-4 sentences) cover letter opening angle that bridges the candidate's background to this specific role."
+  "education": [
+    {
+      "degree": "Degree Name",
+      "institution": "University Name",
+      "dates": "YYYY – YYYY"
+    }
+  ]
 }
 
 Rules:
-- keywords: exact ATS keywords from the JD the candidate should weave into their resume (max 6)
-- skills: specific tools/methods/competencies to highlight or briefly mention (max 4)
-- bullets: 3 concrete resume bullets rewritten to match this role's language and requirements — make them specific and quantified if possible
-- deemphasize: 2 things from their background that are less relevant for this role
-- angle: a compelling, honest bridge narrative for a cover letter opening
-
-Return ONLY valid JSON. No markdown, no explanation.`;
+- Keep all real facts from the original resume — do NOT invent experience or credentials
+- Rewrite bullet points to mirror the JD's language and emphasise most relevant work
+- Prioritise and reorder experience bullets to highlight what matters most for this role
+- Add ATS keywords from the JD naturally into bullets and summary
+- Keep skills list focused on what's relevant to this role
+- Return ONLY valid JSON. No markdown, no explanation.`;
 
   try {
     const model = document.getElementById('modelSelect').value;
@@ -1341,67 +1370,219 @@ Return ONLY valid JSON. No markdown, no explanation.`;
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are an expert resume coach. Output ONLY raw valid JSON. Start with { and end with }.' },
+          { role: 'system', content: 'You are an expert resume writer. Output ONLY raw valid JSON starting with { and ending with }. Never invent facts.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 1400,
-        temperature: 0.8,
+        max_tokens: 2000,
+        temperature: 0.7,
       }),
     });
 
     if (!response.ok) throw new Error('API error ' + response.status);
     const data = await response.json();
     const raw = data.choices[0].message.content;
-    const t = cleanMiniMaxJSON(raw);
-    renderTailorResult(t, job.title, job.company);
+    tailorData = cleanMiniMaxJSON(raw);
+    renderTailorPreview(tailorData, job.title, job.company);
   } catch (e) {
     document.getElementById('tailorBody').innerHTML =
-      `<div class="tailor-error">✗ Could not generate suggestions: ${escHtml(e.message)}</div>`;
+      `<div class="tailor-error">✗ Could not generate tailored resume: ${escHtml(e.message)}</div>`;
   }
 }
 
-function renderTailorResult(t, title, company) {
-  const keywords = (t.keywords || []).map(k => `<span class="tailor-chip">${escHtml(k)}</span>`).join('');
-  const skills   = (t.skills   || []).map(s => `<span class="tailor-chip cyan">${escHtml(s)}</span>`).join('');
-  const deemph   = (t.deemphasize || []).map(d => `<span class="tailor-chip" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#f87171;">${escHtml(d)}</span>`).join('');
-  const bullets  = (t.bullets  || []).map(b => `<li>${escHtml(b)}</li>`).join('');
+function renderTailorPreview(t, title, company) {
+  const skills = (t.skills || []).map(s => `<span class="tailor-chip cyan">${escHtml(s)}</span>`).join('');
+
+  const expHTML = (t.experience || []).map(exp => `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+        <strong style="font-size:13px;color:var(--text)">${escHtml(exp.title || '')}${exp.company ? ` · <span style="font-weight:400;color:var(--text-dim)">${escHtml(exp.company)}</span>` : ''}</strong>
+        <span style="font-size:11px;color:var(--text-faint);white-space:nowrap">${escHtml(exp.dates || '')}</span>
+      </div>
+      <ul class="tailor-bullets" style="margin-top:8px">
+        ${(exp.bullets || []).map(b => `<li>${escHtml(b)}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+  const eduHTML = (t.education || []).map(e => `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${escHtml(e.degree || '')}</div>
+        <div style="font-size:12px;color:var(--text-dim)">${escHtml(e.institution || '')}</div>
+      </div>
+      <span style="font-size:11px;color:var(--text-faint);white-space:nowrap">${escHtml(e.dates || '')}</span>
+    </div>`).join('');
 
   document.getElementById('tailorBody').innerHTML = `
-    <div class="tailor-section">
-      <div class="tailor-section-title">🔑 ATS Keywords to Include</div>
-      <div class="tailor-chips">${keywords || '<span style="color:var(--text-faint);font-size:13px">None identified</span>'}</div>
+    <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#6ee7b7;">
+      ✓ Tailored resume generated — review below, then download as PDF
     </div>
+
     <div class="tailor-section">
-      <div class="tailor-section-title">🛠 Skills & Tools to Highlight</div>
-      <div class="tailor-chips">${skills || '<span style="color:var(--text-faint);font-size:13px">None identified</span>'}</div>
+      <div class="tailor-section-title">👤 Name & Contact</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">${escHtml(t.name || '—')}</div>
+      <div style="font-size:12px;color:var(--text-dim)">${escHtml(t.contact || '—')}</div>
     </div>
+
     <div class="tailor-section">
-      <div class="tailor-section-title">📝 Rewritten Resume Bullets</div>
-      <ul class="tailor-bullets">${bullets || '<li>No bullet suggestions generated</li>'}</ul>
+      <div class="tailor-section-title">📝 Tailored Summary</div>
+      <div class="tailor-angle">${escHtml(t.summary || '—')}</div>
     </div>
-    ${deemph ? `<div class="tailor-section">
-      <div class="tailor-section-title">🚫 De-emphasize or Remove</div>
-      <div class="tailor-chips">${deemph}</div>
+
+    <div class="tailor-section">
+      <div class="tailor-section-title">🛠 Skills</div>
+      <div class="tailor-chips">${skills || '<span style="color:var(--text-faint);font-size:13px">None</span>'}</div>
+    </div>
+
+    ${expHTML ? `<div class="tailor-section">
+      <div class="tailor-section-title">💼 Experience</div>
+      ${expHTML}
     </div>` : ''}
-    <div class="tailor-section">
-      <div class="tailor-section-title">✉️ Cover Letter Opening Angle</div>
-      <div class="tailor-angle">${escHtml(t.angle || 'No angle generated.')}</div>
-    </div>`;
 
-  // Build copy text
-  tailorReportText = `TAILOR RESUME — ${title}${company ? ` at ${company}` : ''}\n\n` +
-    `ATS KEYWORDS\n${(t.keywords||[]).join(', ')}\n\n` +
-    `SKILLS TO HIGHLIGHT\n${(t.skills||[]).join(', ')}\n\n` +
-    `RESUME BULLETS\n${(t.bullets||[]).map((b,i)=>`${i+1}. ${b}`).join('\n')}\n\n` +
-    (t.deemphasize?.length ? `DE-EMPHASIZE\n${t.deemphasize.join(', ')}\n\n` : '') +
-    `COVER LETTER ANGLE\n${t.angle||''}`;
+    ${eduHTML ? `<div class="tailor-section">
+      <div class="tailor-section-title">🎓 Education</div>
+      ${eduHTML}
+    </div>` : ''}`;
 
-  document.getElementById('tailorCopyBtn').style.display = 'inline-flex';
+  document.getElementById('tailorDownloadBtn').style.display = 'inline-flex';
 }
 
-function copyTailorReport() {
-  if (!tailorReportText) return;
-  navigator.clipboard.writeText(tailorReportText).then(() => toast('Suggestions copied ✓', 'success'));
+function downloadTailoredPDF() {
+  if (!tailorData) return;
+  const t = tailorData;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const pageW  = doc.internal.pageSize.getWidth();
+  const pageH  = doc.internal.pageSize.getHeight();
+  const ml = 50, mr = 50;
+  const contentW = pageW - ml - mr;
+  let y = 50;
+
+  const checkPage = (needed = 40) => {
+    if (y + needed > pageH - 40) { doc.addPage(); y = 50; }
+  };
+
+  const setFont = (size, style, r, g, b) => {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style || 'normal');
+    doc.setTextColor(r ?? 30, g ?? 30, b ?? 30);
+  };
+
+  const writeWrapped = (text, size, style, r, g, b, indent = 0) => {
+    setFont(size, style, r, g, b);
+    const lines = doc.splitTextToSize(text, contentW - indent);
+    checkPage(lines.length * size * 1.35);
+    doc.text(lines, ml + indent, y);
+    y += lines.length * size * 1.35 + 3;
+  };
+
+  const drawHRule = () => {
+    checkPage(20);
+    y += 6;
+    doc.setDrawColor(210, 210, 220);
+    doc.setLineWidth(0.5);
+    doc.line(ml, y, pageW - mr, y);
+    y += 10;
+  };
+
+  const sectionLabel = (label) => {
+    drawHRule();
+    setFont(8, 'bold', 110, 110, 130);
+    doc.text(label.toUpperCase(), ml, y);
+    y += 14;
+  };
+
+  // ── Header ──
+  setFont(22, 'bold', 20, 20, 30);
+  doc.text(t.name || 'Resume', ml, y);
+  y += 28;
+
+  if (t.contact) {
+    setFont(9.5, 'normal', 100, 100, 120);
+    const contactLines = doc.splitTextToSize(t.contact, contentW);
+    doc.text(contactLines, ml, y);
+    y += contactLines.length * 13 + 4;
+  }
+
+  // ── Summary ──
+  if (t.summary) {
+    sectionLabel('Professional Summary');
+    writeWrapped(t.summary, 10, 'normal', 50, 50, 65);
+    y += 4;
+  }
+
+  // ── Skills ──
+  if (t.skills?.length) {
+    sectionLabel('Skills');
+    writeWrapped(t.skills.join('  ·  '), 10, 'normal', 50, 50, 65);
+    y += 4;
+  }
+
+  // ── Experience ──
+  if (t.experience?.length) {
+    sectionLabel('Experience');
+    for (const exp of t.experience) {
+      checkPage(60);
+      // Title + dates on same line
+      setFont(11, 'bold', 20, 20, 30);
+      const titleStr = exp.title || '';
+      const dateStr  = exp.dates || '';
+      doc.text(titleStr, ml, y);
+      if (dateStr) {
+        setFont(9, 'normal', 120, 120, 140);
+        doc.text(dateStr, pageW - mr, y, { align: 'right' });
+      }
+      y += 15;
+      // Company
+      if (exp.company) {
+        setFont(9.5, 'italic', 90, 90, 110);
+        doc.text(exp.company, ml, y);
+        y += 14;
+      }
+      // Bullets
+      for (const bullet of (exp.bullets || [])) {
+        setFont(9.5, 'normal', 50, 50, 65);
+        const lines = doc.splitTextToSize('•  ' + bullet, contentW - 10);
+        checkPage(lines.length * 13 + 4);
+        doc.text(lines, ml + 8, y);
+        y += lines.length * 13 + 4;
+      }
+      y += 8;
+    }
+  }
+
+  // ── Education ──
+  if (t.education?.length) {
+    sectionLabel('Education');
+    for (const edu of t.education) {
+      checkPage(40);
+      setFont(11, 'bold', 20, 20, 30);
+      doc.text(edu.degree || '', ml, y);
+      if (edu.dates) {
+        setFont(9, 'normal', 120, 120, 140);
+        doc.text(edu.dates, pageW - mr, y, { align: 'right' });
+      }
+      y += 15;
+      if (edu.institution) {
+        setFont(9.5, 'italic', 90, 90, 110);
+        doc.text(edu.institution, ml, y);
+        y += 16;
+      }
+    }
+  }
+
+  // ── Footer note ──
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    setFont(8, 'normal', 160, 160, 175);
+    doc.text(`Tailored for: ${tailorJobTitle}  ·  Generated by Career-Ops`, pageW / 2, pageH - 24, { align: 'center' });
+  }
+
+  const safeName = (t.name || 'Resume').replace(/[^a-z0-9]/gi, '_');
+  const safeJob  = tailorJobTitle.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
+  doc.save(`${safeName}_${safeJob}_tailored.pdf`);
+  toast('Resume PDF downloaded ✓', 'success');
 }
 
 function exportAll() {
@@ -1655,6 +1836,10 @@ async function importFromPDF(input) {
     console.log('[PDF] Extracted', text.length, 'chars from', pdf.numPages, 'pages');
 
     if (!text.trim()) throw new Error('No text found in PDF');
+
+    // Persist raw text so "Tailor Resume" can generate a full tailored PDF later
+    resumeRaw = text;
+    localStorage.setItem('co_resume_raw', text);
 
     setStatus('🤖 AI is reading your resume…');
 
