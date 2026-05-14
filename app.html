@@ -971,26 +971,27 @@ async function runAll() {
   const total = pending.length;
   let done = 0;
 
-  for (const job of pending) {
+  // Mark all as evaluating at once so the UI shows them all in-flight
+  pending.forEach(job => { job.status = 'evaluating'; });
+  renderJobs();
+
+  // Fire all API calls simultaneously
+  await Promise.all(pending.map(async job => {
     await evalJob(job);
     done++;
-    const pct = Math.round((done / total) * 100);
-    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressFill').style.width = Math.round((done / total) * 100) + '%';
     document.getElementById('runInfo').innerHTML = `<strong>${done}/${total}</strong> evaluated`;
     renderJobs();
-    // small pause between calls
-    await delay(600);
-  }
+  }));
 
   running = false;
   document.getElementById('runBtn').textContent = '▶ Evaluate All';
+  document.getElementById('progressWrap').style.display = 'none';
   toast(`✓ All ${total} jobs evaluated!`, 'success');
 }
 
 async function evalJob(job) {
   job.status = 'evaluating';
-  renderJobs();
-
   const prompt = buildPrompt(job);
 
   try {
