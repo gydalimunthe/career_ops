@@ -449,6 +449,57 @@
   .modal p { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
 
+  /* TAILOR MODAL */
+  .tailor-modal {
+    max-width: 660px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .tailor-modal h2 { margin-bottom: 4px; }
+  .tailor-job-name { font-size: 13px; color: var(--purple); margin-bottom: 18px; font-weight: 500; }
+  .tailor-section { margin-bottom: 22px; }
+  .tailor-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--text-faint); margin-bottom: 10px;
+  }
+  .tailor-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tailor-chip {
+    background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.25);
+    border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--purple);
+    font-weight: 500;
+  }
+  .tailor-chip.cyan { background: rgba(6,182,212,.1); border-color: rgba(6,182,212,.25); color: var(--cyan); }
+  .tailor-chip.green { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.25); color: var(--green); }
+  .tailor-bullets { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .tailor-bullets li {
+    font-size: 13px; color: var(--text-dim); padding: 10px 14px;
+    background: rgba(255,255,255,.03); border-radius: 8px; border-left: 3px solid var(--purple);
+    line-height: 1.5;
+  }
+  .tailor-angle {
+    background: rgba(6,182,212,.07); border: 1px solid rgba(6,182,212,.18);
+    border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--text);
+    line-height: 1.7; font-style: italic;
+  }
+  .tailor-loading {
+    text-align: center; padding: 40px 0;
+    color: var(--text-dim); font-size: 14px;
+  }
+  .tailor-loading .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--purple); border-radius: 50%;
+    animation: spin .7s linear infinite; margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tailor-error { color: #f87171; font-size: 13px; padding: 20px 0; text-align: center; }
+  .btn-tailor {
+    background: linear-gradient(135deg, rgba(139,92,246,.18), rgba(6,182,212,.12));
+    border: 1px solid rgba(139,92,246,.35); color: var(--purple);
+    padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: all .2s;
+  }
+  .btn-tailor:hover { background: rgba(139,92,246,.28); border-color: var(--purple); }
+
   /* RESPONSIVE */
   @media (max-width: 768px) {
     .app-layout { grid-template-columns: 1fr; }
@@ -753,6 +804,24 @@
   </div>
 </div>
 
+<!-- TAILOR RESUME MODAL -->
+<div class="modal-bg" id="tailorModal">
+  <div class="modal tailor-modal">
+    <h2>✂️ Tailor Your Resume</h2>
+    <div class="tailor-job-name" id="tailorJobName"></div>
+    <div id="tailorBody">
+      <div class="tailor-loading">
+        <div class="spinner"></div>
+        Generating tailored suggestions…
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('tailorModal')">Close</button>
+      <button class="btn btn-primary btn-sm" id="tailorCopyBtn" style="display:none" onclick="copyTailorReport()">Copy Suggestions</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════
 //  STATE
@@ -922,6 +991,9 @@ function renderJobs() {
     const copyBtn = job.result
       ? `<button class="btn btn-ghost btn-sm" onclick="copyReport(${job.id})">Copy Report</button>`
       : '';
+    const tailorBtn = (job.result && job.result.recommendation === 'CONSIDER')
+      ? `<button class="btn-tailor" onclick="tailorResume(${job.id})">✂️ Tailor Resume</button>`
+      : '';
 
     card.innerHTML = `
       <button class="delete-btn" onclick="removeJob(${job.id})" title="Remove">×</button>
@@ -933,7 +1005,7 @@ function renderJobs() {
         ${badge}
       </div>
       ${scoreHTML}
-      <div class="job-actions">${evalBtn}${copyBtn}</div>
+      <div class="job-actions">${evalBtn}${copyBtn}${tailorBtn}</div>
     `;
 
     list.appendChild(card);
@@ -1203,6 +1275,135 @@ ${r.pitch ? `## Pitch Angle\n"${r.pitch}"` : ''}
   navigator.clipboard.writeText(md).then(() => toast('Report copied to clipboard ✓', 'success'));
 }
 
+// ═══════════════════════════════
+//  TAILOR RESUME
+// ═══════════════════════════════
+let tailorReportText = ''; // for copy button
+
+async function tailorResume(id) {
+  const job = jobs.find(j => j.id === id);
+  if (!job) return;
+
+  // Open modal in loading state
+  document.getElementById('tailorJobName').textContent = job.title + (job.company ? ` · ${job.company}` : '');
+  document.getElementById('tailorBody').innerHTML = `
+    <div class="tailor-loading">
+      <div class="spinner"></div>
+      Generating tailored suggestions…
+    </div>`;
+  document.getElementById('tailorCopyBtn').style.display = 'none';
+  tailorReportText = '';
+  openModal('tailorModal');
+
+  const p = profile;
+  const prompt = `You are an expert resume coach. A candidate got a "CONSIDER" rating for a job — meaning they're a partial fit and need to strategically tailor their resume to improve their chances.
+
+## CANDIDATE PROFILE
+${p.bg || '(No background provided)'}
+Target roles: ${p.targetRoles || 'Not specified'}
+Visa/work status: ${p.visa || 'Not specified'}
+
+## JOB TITLE
+${job.title}${job.company ? ` at ${job.company}` : ''}
+
+## JOB DESCRIPTION
+${job.desc.slice(0, 4000)}
+
+## TASK
+Analyze the gap between the candidate's profile and this job. Return ONLY a JSON object in exactly this format:
+
+{
+  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
+  "skills": ["skill1", "skill2", "skill3", "skill4"],
+  "bullets": [
+    "Rewritten resume bullet 1 that highlights relevant experience for this role",
+    "Rewritten resume bullet 2",
+    "Rewritten resume bullet 3"
+  ],
+  "deemphasize": ["thing to remove or downplay 1", "thing to remove or downplay 2"],
+  "angle": "One paragraph (3-4 sentences) cover letter opening angle that bridges the candidate's background to this specific role."
+}
+
+Rules:
+- keywords: exact ATS keywords from the JD the candidate should weave into their resume (max 6)
+- skills: specific tools/methods/competencies to highlight or briefly mention (max 4)
+- bullets: 3 concrete resume bullets rewritten to match this role's language and requirements — make them specific and quantified if possible
+- deemphasize: 2 things from their background that are less relevant for this role
+- angle: a compelling, honest bridge narrative for a cover letter opening
+
+Return ONLY valid JSON. No markdown, no explanation.`;
+
+  try {
+    const model = document.getElementById('modelSelect').value;
+    const response = await fetch(MINIMAX_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + MINIMAX_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You are an expert resume coach. Output ONLY raw valid JSON. Start with { and end with }.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 1400,
+        temperature: 0.8,
+      }),
+    });
+
+    if (!response.ok) throw new Error('API error ' + response.status);
+    const data = await response.json();
+    const raw = data.choices[0].message.content;
+    const t = cleanMiniMaxJSON(raw);
+    renderTailorResult(t, job.title, job.company);
+  } catch (e) {
+    document.getElementById('tailorBody').innerHTML =
+      `<div class="tailor-error">✗ Could not generate suggestions: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderTailorResult(t, title, company) {
+  const keywords = (t.keywords || []).map(k => `<span class="tailor-chip">${escHtml(k)}</span>`).join('');
+  const skills   = (t.skills   || []).map(s => `<span class="tailor-chip cyan">${escHtml(s)}</span>`).join('');
+  const deemph   = (t.deemphasize || []).map(d => `<span class="tailor-chip" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#f87171;">${escHtml(d)}</span>`).join('');
+  const bullets  = (t.bullets  || []).map(b => `<li>${escHtml(b)}</li>`).join('');
+
+  document.getElementById('tailorBody').innerHTML = `
+    <div class="tailor-section">
+      <div class="tailor-section-title">🔑 ATS Keywords to Include</div>
+      <div class="tailor-chips">${keywords || '<span style="color:var(--text-faint);font-size:13px">None identified</span>'}</div>
+    </div>
+    <div class="tailor-section">
+      <div class="tailor-section-title">🛠 Skills & Tools to Highlight</div>
+      <div class="tailor-chips">${skills || '<span style="color:var(--text-faint);font-size:13px">None identified</span>'}</div>
+    </div>
+    <div class="tailor-section">
+      <div class="tailor-section-title">📝 Rewritten Resume Bullets</div>
+      <ul class="tailor-bullets">${bullets || '<li>No bullet suggestions generated</li>'}</ul>
+    </div>
+    ${deemph ? `<div class="tailor-section">
+      <div class="tailor-section-title">🚫 De-emphasize or Remove</div>
+      <div class="tailor-chips">${deemph}</div>
+    </div>` : ''}
+    <div class="tailor-section">
+      <div class="tailor-section-title">✉️ Cover Letter Opening Angle</div>
+      <div class="tailor-angle">${escHtml(t.angle || 'No angle generated.')}</div>
+    </div>`;
+
+  // Build copy text
+  tailorReportText = `TAILOR RESUME — ${title}${company ? ` at ${company}` : ''}\n\n` +
+    `ATS KEYWORDS\n${(t.keywords||[]).join(', ')}\n\n` +
+    `SKILLS TO HIGHLIGHT\n${(t.skills||[]).join(', ')}\n\n` +
+    `RESUME BULLETS\n${(t.bullets||[]).map((b,i)=>`${i+1}. ${b}`).join('\n')}\n\n` +
+    (t.deemphasize?.length ? `DE-EMPHASIZE\n${t.deemphasize.join(', ')}\n\n` : '') +
+    `COVER LETTER ANGLE\n${t.angle||''}`;
+
+  document.getElementById('tailorCopyBtn').style.display = 'inline-flex';
+}
+
+function copyTailorReport() {
+  if (!tailorReportText) return;
+  navigator.clipboard.writeText(tailorReportText).then(() => toast('Suggestions copied ✓', 'success'));
+}
+
 function exportAll() {
   const done = jobs.filter(j => j.result);
   if (done.length === 0) { toast('No evaluated jobs to export', 'error'); return; }
@@ -1270,6 +1471,9 @@ function escHtml(s) {
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
